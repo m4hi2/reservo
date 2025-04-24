@@ -1,0 +1,21 @@
+package reservo
+
+type Pool struct {
+	name string
+	redisClient *RedisClient
+	initFn func() []*Resource
+}
+
+type Resource struct {
+	key string
+	value any
+}
+
+func NewPool(name string, rc *RedisClient) (*Pool, error) {
+	p := &Pool{
+		name: name
+		redisClient: rc
+	}
+
+	return p, nil
+}
