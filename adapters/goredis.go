@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"github.com/bsm/redislock"
 	"github.com/m4hi2/reservo"
 	"github.com/redis/go-redis/v9"
@@ -42,6 +43,7 @@ func (adapter *GoRedisAdapter) RPush(ctx context.Context, key string, values ...
 }
 
 func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Duration) (reservo.Locker, error) {
+	key = fmt.Sprintf("%s:lock", key)
 	l, err := adapter.LockClient.Obtain(ctx, key, ttl, nil)
 	if err != nil {
 		return nil, err

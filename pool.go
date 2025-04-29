@@ -89,6 +89,13 @@ func (p *Pool) createRedisPool() error {
 		return nil
 	}
 
+	lock, err := p.getManagementLock()
+	defer lock.Release(context.Background())
+
+	if err != nil {
+		return err
+	}
+
 	initRes := p.initFn()
 
 	poolKeys := make([]string, 0, len(initRes))
@@ -115,11 +122,29 @@ func (p *Pool) getPoolName() string {
 	return fmt.Sprintf("%s:%s", PoolNamePreFix, p.name)
 }
 
+func (p *Pool) getManagementLock() (Locker, error) {
+	managementKey := fmt.Sprintf("%s:management", p.getPoolName())
+
+	l, err := p.redisClient.Lock(context.Background(), managementKey, p.lockTtl)
+	if err != nil {
+		return nil, err
+	}
+
+	return l, nil
+
+}
+
 func (p *Pool) getAllocatedResourcesKey() string {
 	return fmt.Sprintf("%s:%s", AllocatedPreFix, p.name)
 }
 
 func (p *Pool) createResInRedis(res *Resource) error {
+	l, err := p.redisClient.Lock(context.Background(), res.Key, p.lockTtl)
+	defer l.Release(context.Background())
+	if err != nil {
+		return err
+	}
+
 	resKey := fmt.Sprintf("%s:%s", ResourceNamePreFix, res.Key)
 	if err := p.redisClient.Set(context.TODO(), resKey, res.Value, p.ttl); err != nil {
 		return err
