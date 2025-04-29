@@ -16,6 +16,11 @@ type RedisClient interface {
 	Exists(ctx context.Context, keys ...string) (bool, error)
 	RPush(ctx context.Context, key string, values ...interface{}) error
 	//LPop(ctx context.Context, keys string) (string, error)
+	Lock(ctx context.Context, key string, ttl time.Duration) (Locker, error)
+}
+
+type Locker interface {
+	Release(ctx context.Context) error
 }
 
 // noCopy may be added to structs which must not be copied

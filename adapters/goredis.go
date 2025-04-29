@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"github.com/bsm/redislock"
+	"github.com/m4hi2/reservo"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -38,4 +39,13 @@ func (adapter *GoRedisAdapter) Exists(ctx context.Context, keys ...string) (bool
 
 func (adapter *GoRedisAdapter) RPush(ctx context.Context, key string, values ...interface{}) error {
 	return adapter.Client.RPush(ctx, key, values...).Err()
+}
+
+func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Duration) (reservo.Locker, error) {
+	l, err := adapter.LockClient.Obtain(ctx, key, ttl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return l, nil
 }
