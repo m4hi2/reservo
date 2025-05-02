@@ -17,12 +17,13 @@ type Pool struct {
 	name        string
 	redisClient RedisClient
 	initFn      InitFn
+	newResFn    NewResourceFn
 	ttl         time.Duration
 	lockTtl     time.Duration
 }
 
-// NewResource - used when a resource is expired
-type NewResource func(key, value string, optionals ...any) *Resource
+// NewResourceFn - used when a resource is expired
+type NewResourceFn func(key, value string, optionals ...any) *Resource
 
 // Resource - represents a single resource managed by the Pool.
 // It includes a unique key, an associated value, and an expiration time.
@@ -31,7 +32,6 @@ type Resource struct {
 	noCopy noCopy // Too lazy to figure out how to properly implement this rn. Might figure out later.
 
 	expiresAt time.Time // This expiry is for lock
-	new       NewResource
 	pool      *Pool
 
 	Key   string
@@ -42,11 +42,12 @@ type Resource struct {
 // Optional PoolOpts can be provided to customize the Pool configuration.
 // Returns the created Pool and an error if initialization fails.
 // Default TTL is set to 1 second.
-func NewPool(name string, rc RedisClient, initFn InitFn, opts ...PoolOpts) (*Pool, error) {
+func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn, opts ...PoolOpts) (*Pool, error) {
 	p := &Pool{
 		name:        name,
 		redisClient: rc,
 		initFn:      initFn,
+		newResFn:    newResFn,
 		ttl:         time.Minute,
 		lockTtl:     time.Second,
 	}

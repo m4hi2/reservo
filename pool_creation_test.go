@@ -33,7 +33,14 @@ func TestPoolCreation(t *testing.T) {
 		return res
 	}
 
-	_, err := reservo.NewPool("gg", gra, initFn, reservo.WithLockTTL(time.Second*5), reservo.WithTTL(time.Second*100))
+	newResFn := func(key, value string, opts ...any) *reservo.Resource {
+		return &reservo.Resource{
+			Key:   "key" + key,
+			Value: value,
+		}
+	}
+
+	_, err := reservo.NewPool("gg", gra, initFn, newResFn, reservo.WithLockTTL(time.Second*5), reservo.WithTTL(time.Second*100))
 
 	if err != nil {
 		t.Fatal(err)
