@@ -25,6 +25,10 @@ func (adapter *GoRedisAdapter) Set(ctx context.Context, key string, value string
 	return adapter.Client.Set(ctx, key, value, expiration).Err()
 }
 
+func (adapter *GoRedisAdapter) Get(ctx context.Context, key string) (string, error) {
+	return adapter.Client.Get(ctx, key).Result()
+}
+
 func (adapter *GoRedisAdapter) Exists(ctx context.Context, keys ...string) (bool, error) {
 	c, err := adapter.Client.Exists(ctx, keys...).Result()
 	if err != nil {
@@ -40,6 +44,10 @@ func (adapter *GoRedisAdapter) Exists(ctx context.Context, keys ...string) (bool
 
 func (adapter *GoRedisAdapter) RPush(ctx context.Context, key string, values ...interface{}) error {
 	return adapter.Client.RPush(ctx, key, values...).Err()
+}
+
+func (adapter *GoRedisAdapter) LPop(ctx context.Context, key string) (string, error) {
+	return adapter.Client.LPop(ctx, key).Result()
 }
 
 func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Duration) (reservo.Locker, error) {
