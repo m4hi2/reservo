@@ -14,12 +14,12 @@ type InitFn func() []*Resource
 // Important: the pool only holds pointer to the actual data. Since the data might have a TTL on redis
 // of its own.
 type Pool struct {
-	name        string
-	redisClient RedisClient
-	initFn      InitFn
-	newResFn    NewResourceFn
-	ttl         time.Duration
-	lockTtl     time.Duration
+	name     string
+	rc       RedisClient
+	initFn   InitFn
+	newResFn NewResourceFn
+	ttl      time.Duration
+	lockTtl  time.Duration
 }
 
 // NewResourceFn - used when a resource is expired
@@ -33,6 +33,7 @@ type Resource struct {
 
 	expiresAt time.Time // This expiry is for lock
 	pool      *Pool
+	l         Locker
 
 	Key   string
 	Value string
@@ -44,12 +45,12 @@ type Resource struct {
 // Default TTL is set to 1 second.
 func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn, opts ...PoolOpts) (*Pool, error) {
 	p := &Pool{
-		name:        name,
-		redisClient: rc,
-		initFn:      initFn,
-		newResFn:    newResFn,
-		ttl:         time.Minute,
-		lockTtl:     time.Second,
+		name:     name,
+		rc:       rc,
+		initFn:   initFn,
+		newResFn: newResFn,
+		ttl:      time.Minute,
+		lockTtl:  time.Second,
 	}
 
 	for _, opt := range opts {
@@ -80,6 +81,70 @@ func WithLockTTL(ttl time.Duration) PoolOpts {
 	}
 }
 
+func (p *Pool) GetResource() (*Resource, error) {
+	/*
+		Steps of getting resource:
+		1. Pop a key from pool array
+		2. Create a lock for the key
+		3. Create an entry in the allocated hash
+		4. Access the resource
+
+	*/
+
+	ctx := context.Background()
+
+	resKey, err := p.rc.LPop(ctx, p.getPoolKey())
+	if err != nil {
+		return nil, err
+	}
+
+	l, err := p.rc.Lock(ctx, resKey, p.lockTtl)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.allocate(resKey); err != nil {
+		l.Release(ctx)
+		return nil, err
+	}
+
+	v, err := p.rc.Get(ctx, resKey)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Resource{
+		noCopy:    noCopy{},
+		pool:      p,
+		l:         l,
+		expiresAt: time.Now().Add(p.ttl),
+		Key:       resKey,
+		Value:     v,
+	}
+
+	return res, nil
+
+}
+
+func (p *Pool) allocate(key string) error {
+	ctx := context.Background()
+
+	if err := p.rc.HSet(ctx, p.getAllocatedResourcesKey(), key, "taken"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Pool) deallocate(key string) error {
+	ctx := context.Background()
+	if err := p.rc.HDel(ctx, p.getAllocatedResourcesKey(), key); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *Pool) createRedisPool() error {
 	exists, err := p.checkPoolExists()
 	if err != nil {
@@ -108,7 +173,7 @@ func (p *Pool) createRedisPool() error {
 		}
 	}
 
-	if err := p.redisClient.RPush(context.TODO(), p.getPoolName(), poolKeys); err != nil {
+	if err := p.rc.RPush(context.TODO(), p.getPoolKey(), poolKeys); err != nil {
 		return err
 	}
 
@@ -116,17 +181,17 @@ func (p *Pool) createRedisPool() error {
 }
 
 func (p *Pool) checkPoolExists() (bool, error) {
-	return p.redisClient.Exists(context.TODO(), p.getPoolName(), p.getAllocatedResourcesKey())
+	return p.rc.Exists(context.TODO(), p.getPoolKey(), p.getAllocatedResourcesKey())
 }
 
-func (p *Pool) getPoolName() string {
+func (p *Pool) getPoolKey() string {
 	return fmt.Sprintf("%s:%s", PoolNamePreFix, p.name)
 }
 
 func (p *Pool) getManagementLock() (Locker, error) {
-	managementKey := fmt.Sprintf("%s:management", p.getPoolName())
+	managementKey := fmt.Sprintf("%s:management", p.getPoolKey())
 
-	l, err := p.redisClient.Lock(context.Background(), managementKey, p.lockTtl)
+	l, err := p.rc.Lock(context.Background(), managementKey, p.lockTtl)
 	if err != nil {
 		return nil, err
 	}
@@ -140,14 +205,14 @@ func (p *Pool) getAllocatedResourcesKey() string {
 }
 
 func (p *Pool) createResInRedis(res *Resource) error {
-	l, err := p.redisClient.Lock(context.Background(), res.Key, p.lockTtl)
+	l, err := p.rc.Lock(context.Background(), res.Key, p.lockTtl)
 	defer l.Release(context.Background())
 	if err != nil {
 		return err
 	}
 
-	resKey := fmt.Sprintf("%s:%s", ResourceNamePreFix, res.Key)
-	if err := p.redisClient.Set(context.TODO(), resKey, res.Value, p.ttl); err != nil {
+	//resKey := fmt.Sprintf("%s:%s", ResourceNamePreFix, res.Key)
+	if err := p.rc.Set(context.TODO(), res.Key, res.Value, p.ttl); err != nil {
 		return err
 	}
 

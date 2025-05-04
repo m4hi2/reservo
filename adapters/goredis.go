@@ -14,6 +14,10 @@ type GoRedisAdapter struct {
 	LockClient *redislock.Client
 }
 
+type AdapterLocker struct {
+	l *redislock.Lock
+}
+
 func NewGoRedisAdapter(client *redis.Client) *GoRedisAdapter {
 	return &GoRedisAdapter{
 		Client:     client,
@@ -57,5 +61,29 @@ func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Du
 		return nil, err
 	}
 
-	return l, nil
+	al := &AdapterLocker{
+		l: l,
+	}
+
+	return al, nil
+}
+
+func (adapter *GoRedisAdapter) HSet(ctx context.Context, key string, field string, value string) error {
+	return adapter.Client.HSet(ctx, key, field, value).Err()
+}
+
+func (adapter *GoRedisAdapter) HGet(ctx context.Context, key string, field string) (string, error) {
+	return adapter.Client.HGet(ctx, key, field).Result()
+}
+
+func (adapter *GoRedisAdapter) HDel(ctx context.Context, key string, field string) error {
+	return adapter.Client.HDel(ctx, key, field).Err()
+}
+
+func (al *AdapterLocker) Release(ctx context.Context) error {
+	return al.l.Release(ctx)
+}
+
+func (al *AdapterLocker) Extend(ctx context.Context, ttl time.Duration) error {
+	return al.l.Refresh(ctx, ttl, nil)
 }

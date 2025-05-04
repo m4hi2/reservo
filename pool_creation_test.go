@@ -6,6 +6,7 @@ import (
 	"github.com/m4hi2/reservo/adapters"
 	"github.com/redis/go-redis/v9"
 	assertLib "github.com/stretchr/testify/assert"
+	"log"
 
 	"strconv"
 	"testing"
@@ -40,7 +41,7 @@ func TestPoolCreation(t *testing.T) {
 		}
 	}
 
-	_, err := reservo.NewPool("gg", gra, initFn, newResFn, reservo.WithLockTTL(time.Second*5), reservo.WithTTL(time.Second*100))
+	pool, err := reservo.NewPool("gg", gra, initFn, newResFn, reservo.WithLockTTL(time.Second*5), reservo.WithTTL(time.Second*100))
 
 	if err != nil {
 		t.Fatal(err)
@@ -52,4 +53,13 @@ func TestPoolCreation(t *testing.T) {
 	}
 
 	assert.Equal(int64(10), poolSize)
+
+	res, err := pool.GetResource()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Println(res.Key, res.Value)
+
 }
