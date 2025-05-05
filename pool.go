@@ -11,6 +11,9 @@ import (
 // InitFn - function to have
 type InitFn func() []*Resource
 
+// NewResourceFn - used when a resource is expired
+type NewResourceFn func(key string, optionals ...any) (*Resource, error)
+
 // Pool - manages a collection of resources with a specified TTL, using a RedisClient for backend operations.
 // It supports custom initialization and configuration via InitFn and PoolOpts.
 // Important: the pool only holds pointer to the actual data. Since the data might have a TTL on redis
@@ -22,23 +25,6 @@ type Pool struct {
 	newResFn NewResourceFn
 	ttl      time.Duration
 	lockTtl  time.Duration
-}
-
-// NewResourceFn - used when a resource is expired
-type NewResourceFn func(key string, optionals ...any) (*Resource, error)
-
-// Resource - represents a single resource managed by the Pool.
-// It includes a unique key, an associated value, and an expiration time.
-// The noCopy field is used to prevent accidental copying of Resource instances.
-type Resource struct {
-	noCopy noCopy // Too lazy to figure out how to properly implement this rn. Might figure out later.
-
-	expiresAt time.Time // This expiry is for lock
-	pool      *Pool
-	l         Locker
-
-	Key   string
-	Value string
 }
 
 // NewPool - creates and initializes a new Pool with the given name, Redis client, and resource initialization function.
@@ -64,23 +50,6 @@ func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn,
 	}
 
 	return p, nil
-}
-
-// PoolOpts - modifies the pool with functions.
-type PoolOpts func(*Pool)
-
-// WithTTL - allows user to choose TTL for how long the user wants to use the resource.
-func WithTTL(ttl time.Duration) PoolOpts {
-	return func(p *Pool) {
-		p.ttl = ttl
-	}
-}
-
-// WithLockTTL - sets TTL for the resources created
-func WithLockTTL(ttl time.Duration) PoolOpts {
-	return func(p *Pool) {
-		p.lockTtl = ttl
-	}
 }
 
 func (p *Pool) GetResource() (*Resource, error) {
