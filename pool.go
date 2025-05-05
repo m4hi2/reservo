@@ -2,7 +2,9 @@ package reservo
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 	"time"
 )
 
@@ -23,7 +25,7 @@ type Pool struct {
 }
 
 // NewResourceFn - used when a resource is expired
-type NewResourceFn func(key, value string, optionals ...any) *Resource
+type NewResourceFn func(key string, optionals ...any) (*Resource, error)
 
 // Resource - represents a single resource managed by the Pool.
 // It includes a unique key, an associated value, and an expiration time.
@@ -98,17 +100,11 @@ func (p *Pool) GetResource() (*Resource, error) {
 		return nil, err
 	}
 
-	l, err := p.rc.Lock(ctx, resKey, p.lockTtl)
-	if err != nil {
-		return nil, err
-	}
-
 	if err := p.allocate(resKey); err != nil {
-		l.Release(ctx)
 		return nil, err
 	}
 
-	v, err := p.rc.Get(ctx, resKey)
+	v, l, err := p.getResValue(resKey)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +116,45 @@ func (p *Pool) GetResource() (*Resource, error) {
 		expiresAt: time.Now().Add(p.ttl),
 		Key:       resKey,
 		Value:     v,
+	}
+
+	return res, nil
+
+}
+
+func (p *Pool) getResValue(key string) (string, Locker, error) {
+	ctx := context.Background()
+	var v string
+
+	v, err := p.rc.Get(ctx, key)
+	if errors.Is(err, redis.Nil) {
+		res, err := p.recreateResource(key)
+		if err != nil {
+			return "", nil, err
+		}
+		v = res.Value
+	}
+
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", nil, err
+	}
+
+	l, err := p.rc.Lock(ctx, key, p.lockTtl)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return v, l, nil
+}
+
+func (p *Pool) recreateResource(resKey string) (*Resource, error) {
+	res, err := p.newResFn(resKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.createResInRedis(res); err != nil {
+		return nil, err
 	}
 
 	return res, nil
@@ -156,7 +191,11 @@ func (p *Pool) createRedisPool() error {
 	}
 
 	lock, err := p.getManagementLock()
-	defer lock.Release(context.Background())
+	defer func() {
+		if lock != nil {
+			lock.Release(context.Background())
+		}
+	}()
 
 	if err != nil {
 		return err
@@ -206,7 +245,11 @@ func (p *Pool) getAllocatedResourcesKey() string {
 
 func (p *Pool) createResInRedis(res *Resource) error {
 	l, err := p.rc.Lock(context.Background(), res.Key, p.lockTtl)
-	defer l.Release(context.Background())
+	defer func() {
+		if l != nil {
+			l.Release(context.Background())
+		}
+	}()
 	if err != nil {
 		return err
 	}
