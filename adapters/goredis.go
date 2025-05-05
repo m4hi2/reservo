@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/bsm/redislock"
 	"github.com/m4hi2/reservo"
@@ -54,6 +55,10 @@ func (adapter *GoRedisAdapter) LPop(ctx context.Context, key string) (string, er
 	return adapter.Client.LPop(ctx, key).Result()
 }
 
+func (adapter *GoRedisAdapter) HKeys(ctx context.Context, key string) ([]string, error) {
+	return adapter.Client.HKeys(ctx, key).Result()
+}
+
 func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Duration) (reservo.Locker, error) {
 	key = fmt.Sprintf("%s:lock", key)
 	l, err := adapter.LockClient.Obtain(ctx, key, ttl, nil)
@@ -81,9 +86,16 @@ func (adapter *GoRedisAdapter) HDel(ctx context.Context, key string, field strin
 }
 
 func (al *AdapterLocker) Release(ctx context.Context) error {
-	return al.l.Release(ctx)
+	if err := al.l.Release(ctx); err != nil {
+		if errors.Is(err, redislock.ErrLockNotHeld) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
-func (al *AdapterLocker) Extend(ctx context.Context, ttl time.Duration) error {
+func (al *AdapterLocker) ExtendLock(ctx context.Context, ttl time.Duration) error {
 	return al.l.Refresh(ctx, ttl, nil)
 }

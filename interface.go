@@ -12,6 +12,7 @@ type RedisClient interface {
 	HSet(ctx context.Context, key string, field string, value string) error
 	HGet(ctx context.Context, key string, field string) (string, error)
 	HDel(ctx context.Context, key string, field string) error
+	HKeys(ctx context.Context, key string) ([]string, error)
 	Exists(ctx context.Context, keys ...string) (bool, error)
 	RPush(ctx context.Context, key string, values ...interface{}) error
 	LPop(ctx context.Context, keys string) (string, error)
@@ -20,7 +21,7 @@ type RedisClient interface {
 
 type Locker interface {
 	Release(ctx context.Context) error
-	Extend(ctx context.Context, ttl time.Duration) error
+	ExtendLock(ctx context.Context, ttl time.Duration) error
 }
 
 // noCopy may be added to structs which must not be copied

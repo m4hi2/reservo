@@ -40,7 +40,15 @@ func TestPoolCreation(t *testing.T) {
 		}, nil
 	}
 
-	pool, err := reservo.NewPool("gg", gra, initFn, newResFn, reservo.WithLockTTL(time.Second*5), reservo.WithTTL(time.Second*100))
+	pool, err := reservo.NewPool(
+		"gg",
+		gra,
+		initFn,
+		newResFn,
+		reservo.WithLockTTL(time.Second*5),
+		reservo.WithTTL(time.Second*100),
+		reservo.WithMaintenanceDelay(time.Second*10),
+	)
 
 	if err != nil {
 		t.Fatal(err)

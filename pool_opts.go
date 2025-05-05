@@ -18,3 +18,9 @@ func WithLockTTL(ttl time.Duration) PoolOpts {
 		p.lockTtl = ttl
 	}
 }
+
+func WithMaintenanceDelay(delay time.Duration) PoolOpts {
+	return func(p *Pool) {
+		p.mtncDelay = delay
+	}
+}

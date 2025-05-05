@@ -19,12 +19,13 @@ type NewResourceFn func(key string, optionals ...any) (*Resource, error)
 // Important: the pool only holds pointer to the actual data. Since the data might have a TTL on redis
 // of its own.
 type Pool struct {
-	name     string
-	rc       RedisClient
-	initFn   InitFn
-	newResFn NewResourceFn
-	ttl      time.Duration
-	lockTtl  time.Duration
+	name      string
+	rc        RedisClient
+	initFn    InitFn
+	newResFn  NewResourceFn
+	ttl       time.Duration
+	lockTtl   time.Duration
+	mtncDelay time.Duration
 }
 
 // NewPool - creates and initializes a new Pool with the given name, Redis client, and resource initialization function.
@@ -33,12 +34,13 @@ type Pool struct {
 // Default TTL is set to 1 second.
 func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn, opts ...PoolOpts) (*Pool, error) {
 	p := &Pool{
-		name:     name,
-		rc:       rc,
-		initFn:   initFn,
-		newResFn: newResFn,
-		ttl:      time.Minute,
-		lockTtl:  time.Second,
+		name:      name,
+		rc:        rc,
+		initFn:    initFn,
+		newResFn:  newResFn,
+		ttl:       time.Minute,
+		lockTtl:   time.Second,
+		mtncDelay: time.Minute * 5,
 	}
 
 	for _, opt := range opts {
@@ -48,6 +50,8 @@ func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn,
 	if err := p.createRedisPool(); err != nil {
 		return nil, err
 	}
+
+	p.maintenance()
 
 	return p, nil
 }
@@ -227,14 +231,79 @@ func (p *Pool) createResInRedis(res *Resource) error {
 }
 
 func (p *Pool) returnToPool(ctx context.Context, key string) error {
+	if err := p.deallocate(ctx, key); err != nil {
+		return err
+	}
 
 	if err := p.rc.RPush(ctx, p.getPoolKey(), key); err != nil {
 		return err
 	}
 
-	if err := p.deallocate(ctx, key); err != nil {
+	return nil
+}
+
+func (p *Pool) maintenance() {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// restart after short delay
+				time.Sleep(2 * time.Second)
+				p.maintenance()
+			}
+		}()
+
+		ticker := time.NewTicker(p.mtncDelay)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				_ = p.maintenanceJob()
+			}
+		}
+	}()
+}
+
+func (p *Pool) maintenanceJob() error {
+	ctx := context.Background()
+	l, err := p.getManagementLock()
+	defer func() {
+		if l != nil {
+			l.Release(ctx)
+		}
+	}()
+	if err != nil {
 		return err
 	}
 
+	// This means other pod have a management lock.
+	// Can assume they have run the maintenance job.
+	if l == nil {
+		return nil
+	}
+
+	keys, err := p.rc.HKeys(ctx, p.getAllocatedResourcesKey())
+	if err != nil {
+		return err
+	}
+
+	for _, key := range keys {
+		locked, err := p.isLocked(ctx, key)
+		if err != nil {
+			continue
+		}
+
+		if !locked {
+			if err := p.returnToPool(ctx, key); err != nil {
+				continue
+			}
+		}
+	}
+
 	return nil
+}
+
+func (p *Pool) isLocked(ctx context.Context, key string) (bool, error) {
+	lockKey := fmt.Sprintf("%s:lock", key)
+	return p.rc.Exists(ctx, lockKey)
 }
