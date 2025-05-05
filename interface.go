@@ -19,16 +19,8 @@ type RedisClient interface {
 	Lock(ctx context.Context, key string, ttl time.Duration) (Locker, error)
 }
 
+// Locker - to support multiple locking mechanisms
 type Locker interface {
 	Release(ctx context.Context) error
 	ExtendLock(ctx context.Context, ttl time.Duration) error
 }
-
-// noCopy may be added to structs which must not be copied
-// after the first use.
-//
-// See https://golang.org/issues/8005#issuecomment-190753527
-// for details.
-//
-// Note that it must not be embedded, due to the Lock and Unlock methods.
-type noCopy struct{}
