@@ -1,6 +1,7 @@
 package reservo_test
 
 import (
+	"context"
 	"github.com/m4hi2/reservo"
 	"github.com/m4hi2/reservo/adapters"
 	"github.com/redis/go-redis/v9"
@@ -52,12 +53,16 @@ func TestPoolCreation(t *testing.T) {
 
 	//assert.Equal(int64(10), poolSize)
 
-	res, err := pool.GetResource()
+	res, err := pool.GetResource(context.TODO())
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	log.Println(res.Key, res.Value)
+
+	if err := res.Release(context.TODO()); err != nil {
+		t.Fatal(err)
+	}
 
 }

@@ -52,7 +52,7 @@ func NewPool(name string, rc RedisClient, initFn InitFn, newResFn NewResourceFn,
 	return p, nil
 }
 
-func (p *Pool) GetResource() (*Resource, error) {
+func (p *Pool) GetResource(ctx context.Context) (*Resource, error) {
 	/*
 		Steps of getting resource:
 		1. Pop a key from pool array
@@ -62,18 +62,16 @@ func (p *Pool) GetResource() (*Resource, error) {
 
 	*/
 
-	ctx := context.Background()
-
 	resKey, err := p.rc.LPop(ctx, p.getPoolKey())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := p.allocate(resKey); err != nil {
+	if err := p.allocate(ctx, resKey); err != nil {
 		return nil, err
 	}
 
-	v, l, err := p.getResValue(resKey)
+	v, l, err := p.getResValue(ctx, resKey)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +89,7 @@ func (p *Pool) GetResource() (*Resource, error) {
 
 }
 
-func (p *Pool) getResValue(key string) (string, Locker, error) {
-	ctx := context.Background()
+func (p *Pool) getResValue(ctx context.Context, key string) (string, Locker, error) {
 	var v string
 
 	v, err := p.rc.Get(ctx, key)
@@ -130,8 +127,7 @@ func (p *Pool) recreateResource(resKey string) (*Resource, error) {
 
 }
 
-func (p *Pool) allocate(key string) error {
-	ctx := context.Background()
+func (p *Pool) allocate(ctx context.Context, key string) error {
 
 	if err := p.rc.HSet(ctx, p.getAllocatedResourcesKey(), key, "taken"); err != nil {
 		return err
@@ -140,8 +136,7 @@ func (p *Pool) allocate(key string) error {
 	return nil
 }
 
-func (p *Pool) deallocate(key string) error {
-	ctx := context.Background()
+func (p *Pool) deallocate(ctx context.Context, key string) error {
 	if err := p.rc.HDel(ctx, p.getAllocatedResourcesKey(), key); err != nil {
 		return err
 	}
@@ -225,6 +220,19 @@ func (p *Pool) createResInRedis(res *Resource) error {
 
 	//resKey := fmt.Sprintf("%s:%s", ResourceNamePreFix, res.Key)
 	if err := p.rc.Set(context.TODO(), res.Key, res.Value, p.ttl); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Pool) returnToPool(ctx context.Context, key string) error {
+
+	if err := p.rc.RPush(ctx, p.getPoolKey(), key); err != nil {
+		return err
+	}
+
+	if err := p.deallocate(ctx, key); err != nil {
 		return err
 	}
 

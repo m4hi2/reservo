@@ -1,6 +1,9 @@
 package reservo
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Resource - represents a single resource managed by the Pool.
 // It includes a unique key, an associated value, and an expiration time.
@@ -14,4 +17,17 @@ type Resource struct {
 
 	Key   string
 	Value string
+}
+
+func (r *Resource) Release(ctx context.Context) error {
+
+	if err := r.l.Release(ctx); err != nil {
+		return err
+	}
+
+	if err := r.pool.returnToPool(ctx, r.Key); err != nil {
+		return err
+	}
+
+	return nil
 }
