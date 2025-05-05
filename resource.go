@@ -17,6 +17,7 @@ type Resource struct {
 	Value string
 }
 
+// Release - returns the resource to the pool
 func (r *Resource) Release(ctx context.Context) error {
 
 	if err := r.l.Release(ctx); err != nil {
@@ -27,5 +28,16 @@ func (r *Resource) Release(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+// Refresh - extends lock on a resource
+
+func (r *Resource) Refresh(ctx context.Context, t time.Duration) error {
+	if err := r.l.ExtendLock(ctx, t); err != nil {
+		return err
+	}
+
+	r.expiresAt.Add(t)
 	return nil
 }
