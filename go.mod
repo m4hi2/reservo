@@ -1,6 +1,6 @@
 module github.com/m4hi2/reservo
 
-go 1.24.2
+go 1.23
 
 require (
 	github.com/bsm/redislock v0.9.4
