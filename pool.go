@@ -22,6 +22,7 @@ type Pool struct {
 	rc            RedisClient
 	initFn        InitFn
 	resRecreateFn ResRecreateFn
+	retryCount    int
 	ttl           time.Duration
 	lockTtl       time.Duration
 	mtncDelay     time.Duration
@@ -36,6 +37,7 @@ func NewPool(name string, rc RedisClient, initFn InitFn, resRecreateFn ResRecrea
 		rc:            rc,
 		initFn:        initFn,
 		resRecreateFn: resRecreateFn,
+		retryCount:    3,
 		ttl:           time.Minute,
 		lockTtl:       time.Second,
 		mtncDelay:     time.Minute * 5,
@@ -45,7 +47,7 @@ func NewPool(name string, rc RedisClient, initFn InitFn, resRecreateFn ResRecrea
 		opt(p)
 	}
 
-	if err := p.createRedisPool(); err != nil {
+	if err := p.createRedisPool(0); err != nil {
 		return nil, err
 	}
 
@@ -111,5 +113,12 @@ func WithTTL(ttl time.Duration) PoolOpts {
 func WithLockTTL(ttl time.Duration) PoolOpts {
 	return func(p *Pool) {
 		p.lockTtl = ttl
+	}
+}
+
+// WithRetryCount - sets retry count for various retries
+func WithRetryCount(count int) PoolOpts {
+	return func(p *Pool) {
+		p.retryCount = count
 	}
 }

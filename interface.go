@@ -21,6 +21,7 @@ type RedisClient interface {
 
 // Locker - to support multiple locking mechanisms
 type Locker interface {
-	Release(ctx context.Context) error
 	ExtendLock(ctx context.Context, ttl time.Duration) error
+	Release(ctx context.Context) error
+	TTL(ctx context.Context) (time.Duration, error)
 }

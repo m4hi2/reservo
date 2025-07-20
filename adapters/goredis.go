@@ -63,7 +63,7 @@ func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Du
 	key = fmt.Sprintf("%s:lock", key)
 	l, err := adapter.LockClient.Obtain(ctx, key, ttl, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", reservo.ErrLockNotObtained, err)
 	}
 
 	al := &AdapterLocker{
@@ -98,4 +98,15 @@ func (al *AdapterLocker) Release(ctx context.Context) error {
 
 func (al *AdapterLocker) ExtendLock(ctx context.Context, ttl time.Duration) error {
 	return al.l.Refresh(ctx, ttl, nil)
+}
+
+func (al *AdapterLocker) TTL(ctx context.Context) (time.Duration, error) {
+	var td time.Duration = 0
+	var err error = nil
+
+	if td, err = al.l.TTL(ctx); err != nil {
+		return 0, err
+	}
+
+	return td, err
 }

@@ -63,7 +63,7 @@ func (p *Pool) deallocate(ctx context.Context, key string) error {
 	return nil
 }
 
-func (p *Pool) createRedisPool() error {
+func (p *Pool) createRedisPool(retry int) error {
 	exists, err := p.checkPoolExists()
 	if err != nil {
 		return err
@@ -81,6 +81,13 @@ func (p *Pool) createRedisPool() error {
 	}()
 
 	if err != nil {
+		if errors.Is(err, ErrLockNotObtained) {
+			if p.retryCount >= retry {
+				time.Sleep(p.lockTtl)
+				return p.createRedisPool(retry + 1)
+			}
+
+		}
 		return err
 	}
 
