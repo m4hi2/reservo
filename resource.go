@@ -32,7 +32,6 @@ func (r *Resource) Release(ctx context.Context) error {
 }
 
 // Refresh - extends lock on a resource
-
 func (r *Resource) Refresh(ctx context.Context, t time.Duration) error {
 	if err := r.l.ExtendLock(ctx, t); err != nil {
 		return err
@@ -40,4 +39,23 @@ func (r *Resource) Refresh(ctx context.Context, t time.Duration) error {
 
 	r.expiresAt.Add(t)
 	return nil
+}
+
+// IsExpired - checks if the resource lock is still held
+func (r *Resource) IsExpired(ctx context.Context) (bool, error) {
+	t, err := r.l.TTL(ctx)
+	if err != nil {
+		return true, err
+	}
+
+	if t == 0 || r.expiresAt.After(time.Now()) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// TTL - returns the ttl of the resource lock
+func (r *Resource) TTL(ctx context.Context) (time.Duration, error) {
+	return r.l.TTL(ctx)
 }
