@@ -48,7 +48,7 @@ func (r *Resource) IsExpired(ctx context.Context) (bool, error) {
 		return true, err
 	}
 
-	if t == 0 || r.expiresAt.After(time.Now()) {
+	if t == 0 || time.Now().After(r.expiresAt) {
 		return true, nil
 	}
 
