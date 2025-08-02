@@ -37,7 +37,7 @@ func (r *Resource) Refresh(ctx context.Context, t time.Duration) error {
 		return err
 	}
 
-	r.expiresAt.Add(t)
+	r.expiresAt = r.expiresAt.Add(t)
 	return nil
 }
 
