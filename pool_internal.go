@@ -215,6 +215,12 @@ func (p *Pool) maintenanceJob() error {
 			l.Release(ctx)
 		}
 	}()
+
+	if err != nil && errors.Is(err, ErrLockNotObtained) {
+		p.logger.Debugf(formatLogMsg("Management lock is held by another container: %v"), err)
+		return nil
+	}
+
 	if err != nil {
 		p.logger.Errorf(formatLogMsg("Failed to get management lock: %v"), err)
 		return err
