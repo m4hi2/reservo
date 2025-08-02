@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// Logger - defines the interface for logging operations
+type Logger interface {
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
 // RedisClient - to support multiple redis clients
 type RedisClient interface {
 	Set(ctx context.Context, key string, value string, expiration time.Duration) error

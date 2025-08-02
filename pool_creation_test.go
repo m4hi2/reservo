@@ -2,10 +2,11 @@ package reservo_test
 
 import (
 	"context"
+	"log"
+
 	"github.com/m4hi2/reservo"
 	"github.com/m4hi2/reservo/adapters"
 	"github.com/redis/go-redis/v9"
-	"log"
 
 	"strconv"
 	"testing"

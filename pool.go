@@ -26,6 +26,7 @@ type Pool struct {
 	ttl           time.Duration
 	lockTtl       time.Duration
 	mtncDelay     time.Duration
+	logger        Logger
 }
 
 // NewPool - creates and initializes a new Pool with the given name, Redis client, and resource initialization function.
@@ -41,6 +42,7 @@ func NewPool(name string, rc RedisClient, initFn InitFn, resRecreateFn ResRecrea
 		ttl:           time.Minute,
 		lockTtl:       time.Second,
 		mtncDelay:     time.Minute * 5,
+		logger:        &noopLogger{},
 	}
 
 	for _, opt := range opts {
@@ -120,5 +122,12 @@ func WithLockTTL(ttl time.Duration) PoolOpts {
 func WithRetryCount(count int) PoolOpts {
 	return func(p *Pool) {
 		p.retryCount = count
+	}
+}
+
+// WithLogger - configures a logger for the Pool
+func WithLogger(logger Logger) PoolOpts {
+	return func(p *Pool) {
+		p.logger = logger
 	}
 }
