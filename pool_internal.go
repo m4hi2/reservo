@@ -220,7 +220,7 @@ func (p *Pool) maintenanceJob() error {
 	}()
 
 	if err != nil && errors.Is(err, ErrLockNotObtained) {
-		p.logger.Warnf(formatLogMsg("Management lock is held by another container: %v"), err)
+		p.logger.Warnf(formatLogMsg("Management lock is held by another container for pool: %v"), p.name)
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func (p *Pool) maintenanceJob() error {
 		return err
 	}
 
-	p.logger.Infof(formatLogMsg("Checking %d allocated resources"), len(keys))
+	p.logger.Infof(formatLogMsg("Checking %d allocated resources for pool: %s"), len(keys), p.name)
 	for _, key := range keys {
 		locked, err := p.isLocked(ctx, key)
 		if err != nil {
