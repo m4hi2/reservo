@@ -63,7 +63,10 @@ func (adapter *GoRedisAdapter) Lock(ctx context.Context, key string, ttl time.Du
 	key = fmt.Sprintf("%s:lock", key)
 	l, err := adapter.LockClient.Obtain(ctx, key, ttl, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", reservo.ErrLockNotObtained, err)
+		if errors.Is(err, redislock.ErrNotObtained) {
+			return nil, fmt.Errorf("%w: %w", reservo.ErrLockNotObtained, err)
+		}
+		return nil, err
 	}
 
 	al := &AdapterLocker{
