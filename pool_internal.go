@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -85,7 +86,16 @@ func (p *Pool) createRedisPool(retry int) error {
 		if errors.Is(err, ErrLockNotObtained) {
 			p.logger.Debugf(formatLogMsg("Could not obtain management lock, retrying..."))
 			if p.retryCount >= retry {
-				time.Sleep(p.lockTtl)
+				// Calculate exponential backoff with jitter, used retry+1 so that first retry is not 0
+				wait := p.lockTtl.Nanoseconds() * int64(retry+1)
+				jitter := time.Duration(rand.Intn(int(1000))) * time.Millisecond
+				waitTime := time.Duration(wait) + jitter
+
+				if waitTime > MaxWait {
+					waitTime = MaxWait + jitter
+				}
+
+				time.Sleep(waitTime)
 				return p.createRedisPool(retry + 1)
 			}
 		}
