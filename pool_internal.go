@@ -127,7 +127,7 @@ func (p *Pool) getManagementLock() (Locker, error) {
 	managementKey := fmt.Sprintf("%s:management", p.getPoolKey())
 
 	// Looks like the management delay has to be a bit larger than regular lock ttl.
-	managementTTL := p.mtncDelay - time.Millisecond*100
+	managementTTL := p.mtncDelay
 
 	l, err := p.rc.Lock(context.Background(), managementKey, managementTTL)
 	if err != nil {
