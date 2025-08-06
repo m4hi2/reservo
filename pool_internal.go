@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 func (p *Pool) getResValue(ctx context.Context, key string) (string, error) {
@@ -14,7 +12,7 @@ func (p *Pool) getResValue(ctx context.Context, key string) (string, error) {
 
 	p.logger.Debugf("Getting resource value for key: %s", key)
 	v, err := p.rc.Get(ctx, key)
-	if errors.Is(err, redis.Nil) {
+	if errors.Is(err, ErrRedisNil) {
 		p.logger.Infof(formatLogMsg("Resource not found in redis, recreating: %s"), key)
 		res, err := p.recreateResource(key)
 		if err != nil {
@@ -24,7 +22,7 @@ func (p *Pool) getResValue(ctx context.Context, key string) (string, error) {
 		v = res.Value
 	}
 
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err != nil && !errors.Is(err, ErrRedisNil) {
 		return "", err
 	}
 
