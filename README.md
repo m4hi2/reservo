@@ -1,4 +1,4 @@
-# Reservo: Redis-Powered Distributed Resource Pool for God
+# Reservo: Redis-Powered Distributed Resource Pool for Go
 
 ## Efficiently manage scarce resources across cloud instances
 
