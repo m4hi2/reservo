@@ -74,21 +74,25 @@ func (p *Pool) GetResource(ctx context.Context) (*Resource, error) {
 		return nil, err
 	}
 
+	l, err := p.rc.Lock(ctx, resKey, p.lockTtl)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := p.allocate(ctx, resKey); err != nil {
 		return nil, err
 	}
 
-	v, l, err := p.getResValue(ctx, resKey)
+	v, err := p.getResValue(ctx, resKey)
 	if err != nil {
 		return nil, err
 	}
 
 	res := &Resource{
-		pool:      p,
-		l:         l,
-		expiresAt: time.Now().Add(p.ttl),
-		Key:       resKey,
-		Value:     v,
+		pool:  p,
+		l:     l,
+		Key:   resKey,
+		Value: v,
 	}
 
 	return res, nil

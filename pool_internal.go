@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func (p *Pool) getResValue(ctx context.Context, key string) (string, Locker, error) {
+func (p *Pool) getResValue(ctx context.Context, key string) (string, error) {
 	var v string
 
 	p.logger.Debugf("Getting resource value for key: %s", key)
@@ -19,21 +19,16 @@ func (p *Pool) getResValue(ctx context.Context, key string) (string, Locker, err
 		res, err := p.recreateResource(key)
 		if err != nil {
 			p.logger.Errorf(formatLogMsg("Failed to recreate resource %s: %v"), key, err)
-			return "", nil, err
+			return "", err
 		}
 		v = res.Value
 	}
 
 	if err != nil && !errors.Is(err, redis.Nil) {
-		return "", nil, err
+		return "", err
 	}
 
-	l, err := p.rc.Lock(ctx, key, p.lockTtl)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return v, l, nil
+	return v, nil
 }
 
 func (p *Pool) recreateResource(resKey string) (*Resource, error) {
