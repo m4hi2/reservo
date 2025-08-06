@@ -5,6 +5,9 @@
 Reservo provides a battle-tested, self-healing pool for shared resources (API tokens, GPU slots, Sessions, Job Slots) 
 with Redis-backed coordination. Perfect for scaling services in cloud native environments.
 
+P.S: Battle-tested here means - deployed in my regular day job with minor issues. The issues are constantly being 
+monitored and fixed. Created this library because we needed *Distributed Session Management*.
+
 ## Key Features
 
 - ✳️ **Self-healing pools** - Automatic orphan recovery
