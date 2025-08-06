@@ -80,11 +80,40 @@ func (p *Pool) GetResource(ctx context.Context) (*Resource, error) {
 	}
 
 	if err := p.allocate(ctx, resKey); err != nil {
+		defer func() {
+			if l != nil {
+				errN := l.Release(ctx)
+				if errN != nil {
+					p.logger.Errorf(
+						formatLogMsg("Failed to release lock when allocating resource failed: %v"), err,
+					)
+				}
+			}
+
+			err2 := p.rc.RPush(ctx, p.getPoolKey(), resKey)
+			if err2 != nil {
+				p.logger.Errorf(
+					formatLogMsg("Failed to push the key to pool  when allocating resource failed: %v"), err,
+				)
+			}
+		}()
+
 		return nil, err
 	}
 
 	v, err := p.getResValue(ctx, resKey)
 	if err != nil {
+		defer func() {
+			if l != nil {
+				errN := l.Release(ctx)
+				if errN != nil {
+					p.logger.Errorf(
+						formatLogMsg("Failed to release lock when getting res value failed: %v"), err,
+					)
+				}
+			}
+		}()
+
 		return nil, err
 	}
 
