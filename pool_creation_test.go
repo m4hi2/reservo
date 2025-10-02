@@ -2,11 +2,11 @@ package reservo_test
 
 import (
 	"context"
-	"log"
-
 	"github.com/m4hi2/reservo"
 	"github.com/m4hi2/reservo/adapters"
 	"github.com/redis/go-redis/v9"
+	"log"
+	"math/rand"
 
 	"strconv"
 	"testing"
@@ -74,4 +74,20 @@ func TestPoolCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+func TestJitterCode(t *testing.T) {
+	// Calculate exponential backoff with jitter
+	lttl := 5 * time.Second
+	for retry := 0; retry < 5; retry++ {
+		wait := lttl.Nanoseconds() * int64(retry+1)
+		jitter := time.Duration(rand.Intn(int(1000))) * time.Millisecond
+		waitTime := time.Duration(wait) + jitter
+
+		if waitTime > reservo.MaxWait {
+			waitTime = reservo.MaxWait + jitter
+		} // Add jitter
+
+		print(int64(waitTime))
+	}
 }

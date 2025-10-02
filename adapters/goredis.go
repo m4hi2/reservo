@@ -31,7 +31,17 @@ func (adapter *GoRedisAdapter) Set(ctx context.Context, key string, value string
 }
 
 func (adapter *GoRedisAdapter) Get(ctx context.Context, key string) (string, error) {
-	return adapter.Client.Get(ctx, key).Result()
+	s, err := adapter.Client.Get(ctx, key).Result()
+
+	if errors.Is(err, redis.Nil) {
+		return "", fmt.Errorf("key not found in redis: %w", reservo.ErrRedisNil)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return s, nil
 }
 
 func (adapter *GoRedisAdapter) Exists(ctx context.Context, keys ...string) (bool, error) {

@@ -4,36 +4,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
-func (p *Pool) getResValue(ctx context.Context, key string) (string, Locker, error) {
+func (p *Pool) getResValue(ctx context.Context, key string) (string, error) {
 	var v string
 
 	p.logger.Debugf("Getting resource value for key: %s", key)
 	v, err := p.rc.Get(ctx, key)
-	if errors.Is(err, redis.Nil) {
+	if errors.Is(err, ErrRedisNil) {
 		p.logger.Infof(formatLogMsg("Resource not found in redis, recreating: %s"), key)
 		res, err := p.recreateResource(key)
 		if err != nil {
 			p.logger.Errorf(formatLogMsg("Failed to recreate resource %s: %v"), key, err)
-			return "", nil, err
+			return "", err
 		}
 		v = res.Value
 	}
 
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return "", nil, err
+	if err != nil && !errors.Is(err, ErrRedisNil) {
+		return "", err
 	}
 
-	l, err := p.rc.Lock(ctx, key, p.lockTtl)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return v, l, nil
+	return v, nil
 }
 
 func (p *Pool) recreateResource(resKey string) (*Resource, error) {
@@ -92,7 +86,16 @@ func (p *Pool) createRedisPool(retry int) error {
 		if errors.Is(err, ErrLockNotObtained) {
 			p.logger.Debugf(formatLogMsg("Could not obtain management lock, retrying..."))
 			if p.retryCount >= retry {
-				time.Sleep(p.lockTtl)
+				// Calculate exponential backoff with jitter, used retry+1 so that first retry is not 0
+				wait := p.lockTtl.Nanoseconds() * int64(retry+1)
+				jitter := time.Duration(rand.Intn(int(1000))) * time.Millisecond
+				waitTime := time.Duration(wait) + jitter
+
+				if waitTime > MaxWait {
+					waitTime = MaxWait + jitter
+				}
+
+				time.Sleep(waitTime)
 				return p.createRedisPool(retry + 1)
 			}
 		}
@@ -134,7 +137,7 @@ func (p *Pool) getManagementLock() (Locker, error) {
 	managementKey := fmt.Sprintf("%s:management", p.getPoolKey())
 
 	// Looks like the management delay has to be a bit larger than regular lock ttl.
-	managementTTL := p.mtncDelay - time.Millisecond*100
+	managementTTL := p.mtncDelay
 
 	l, err := p.rc.Lock(context.Background(), managementKey, managementTTL)
 	if err != nil {

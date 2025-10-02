@@ -9,9 +9,8 @@ import (
 // It includes a unique key, an associated value, and an expiration time.
 // The noCopy field is used to prevent accidental copying of Resource instances.
 type Resource struct {
-	expiresAt time.Time // This expiry is for lock
-	pool      *Pool
-	l         Locker
+	pool *Pool
+	l    Locker
 
 	Key   string
 	Value string
@@ -33,12 +32,7 @@ func (r *Resource) Release(ctx context.Context) error {
 
 // Refresh - extends lock on a resource
 func (r *Resource) Refresh(ctx context.Context, t time.Duration) error {
-	if err := r.l.ExtendLock(ctx, t); err != nil {
-		return err
-	}
-
-	r.expiresAt = r.expiresAt.Add(t)
-	return nil
+	return r.l.ExtendLock(ctx, t)
 }
 
 // IsExpired - checks if the resource lock is still held
@@ -48,7 +42,7 @@ func (r *Resource) IsExpired(ctx context.Context) (bool, error) {
 		return true, err
 	}
 
-	if t == 0 || time.Now().After(r.expiresAt) {
+	if t == 0 {
 		return true, nil
 	}
 
